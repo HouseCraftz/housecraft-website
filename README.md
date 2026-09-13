@@ -38,12 +38,12 @@ Until configured, task links safely open `https://x.com`. The interface never cl
 1. Create a Supabase project.
 2. Run `supabase/schema.sql` in the Supabase SQL editor.
 3. Copy `.env.example` to `.env.local`.
-4. Add the project URL and anon key.
+4. Add the project URL as `SUPABASE_URL` and the server secret key as `SUPABASE_SECRET_KEY`.
 5. Restart the development server.
 
-The browser submits to `app/api/entries/route.ts`; validation and normalization run again on the server. X usernames and EVM wallets are stored lowercase. Database checks and unique indexes prevent duplicate normalized usernames and wallets. The anon key is designed to be public, while row-level security allows only inserts matching the required completed-task checks. Do not place a Supabase service-role key in this application.
+The browser submits only to `app/api/entries/route.ts`; validation and normalization run again on the server. The server-only data module sends the secret key directly to the Supabase REST API. X usernames and EVM wallets are stored lowercase. Database checks and unique indexes prevent duplicate normalized usernames and wallets. Never prefix the secret key with `NEXT_PUBLIC_`, import the data module into a Client Component, or commit `.env.local`.
 
-Submitted wallets are stored in `public.fcfs_entries`. The SQL revokes all table permissions from anonymous and authenticated browser roles, then grants anonymous users only `INSERT`. There is no public `SELECT`, `UPDATE`, or `DELETE` access. The project owner can view entries from the private Supabase Dashboard/Table Editor; protect the Supabase account and never expose the service-role key.
+Submitted wallets are stored in `public.fcfs_entries`. RLS remains enabled, all table permissions are revoked from anonymous and authenticated browser roles, and no public INSERT policy is created. The secret server credential bypasses RLS only inside the validated API route. The project owner can view entries from the private Supabase Dashboard/Table Editor; protect the Supabase account and never expose the secret key.
 
 ## Deploy to Vercel later
 

@@ -25,11 +25,7 @@ create unique index if not exists fcfs_entries_evm_wallet_unique
 alter table public.fcfs_entries enable row level security;
 
 revoke all on table public.fcfs_entries from anon, authenticated;
-grant insert on table public.fcfs_entries to anon;
-
 drop policy if exists "allow anonymous fcfs entry" on public.fcfs_entries;
-create policy "allow anonymous fcfs entry"
-  on public.fcfs_entries for insert to anon
-  with check (
-    follow_completed and like_completed and repost_completed and comment_completed
-  );
+
+-- No public INSERT policy is created. The validated server route writes with
+-- SUPABASE_SECRET_KEY, which stays server-only and bypasses RLS.

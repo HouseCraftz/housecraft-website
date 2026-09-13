@@ -1,3 +1,5 @@
+import "server-only";
+
 export type FcfsEntry = {
   x_username: string;
   evm_wallet: string;
@@ -10,11 +12,29 @@ export type FcfsEntry = {
 export class EntryConflictError extends Error {}
 export class EntryConfigurationError extends Error {}
 
-export async function createEntry(entry: FcfsEntry) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+type SupabaseError = {
+  code?: unknown;
+  message?: unknown;
+  details?: unknown;
+  hint?: unknown;
+};
 
-  if (!url || !anonKey) {
+function uniqueConflictMessage(error: SupabaseError) {
+  const signature = [error.message, error.details, error.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  if (signature.includes("x_username")) return "This X account is already registered.";
+  if (signature.includes("evm_wallet")) return "This wallet is already registered.";
+  return "This X account or wallet is already registered.";
+}
+
+export async function createEntry(entry: FcfsEntry) {
+  const url = process.env.SUPABASE_URL;
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+
+  if (!url || !secretKey) {
     if (process.env.NODE_ENV === "development") {
       console.info("HouseCraft demo submission (Supabase is not configured):", entry);
       return { demo: true };
@@ -25,8 +45,7 @@ export async function createEntry(entry: FcfsEntry) {
   const response = await fetch(`${url.replace(/\/$/, "")}/rest/v1/fcfs_entries`, {
     method: "POST",
     headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
+      apikey: secretKey,
       "Content-Type": "application/json",
       Prefer: "return=minimal",
     },
@@ -34,7 +53,12 @@ export async function createEntry(entry: FcfsEntry) {
     cache: "no-store",
   });
 
-  if (response.status === 409) throw new EntryConflictError("This X account or wallet is already registered.");
-  if (!response.ok) throw new Error("The entry could not be stored.");
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({})) as SupabaseError;
+    if (response.status === 409 || error.code === "23505") {
+      throw new EntryConflictError(uniqueConflictMessage(error));
+    }
+    throw new Error("The entry could not be stored.");
+  }
   return { demo: false };
 }
