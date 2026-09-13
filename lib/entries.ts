@@ -19,6 +19,20 @@ type SupabaseError = {
   hint?: unknown;
 };
 
+function diagnosticValue(value: unknown) {
+  return typeof value === "string" ? value : undefined;
+}
+
+function logSupabaseError(status: number, error: SupabaseError) {
+  console.error("HouseCraft Supabase insert failed", {
+    status,
+    code: diagnosticValue(error.code),
+    message: diagnosticValue(error.message),
+    details: diagnosticValue(error.details),
+    hint: diagnosticValue(error.hint),
+  });
+}
+
 function uniqueConflictMessage(error: SupabaseError) {
   const signature = [error.message, error.details, error.hint]
     .filter((value): value is string => typeof value === "string")
@@ -42,19 +56,30 @@ export async function createEntry(entry: FcfsEntry) {
     throw new EntryConfigurationError("Database is not configured.");
   }
 
-  const response = await fetch(`${url.replace(/\/$/, "")}/rest/v1/fcfs_entries`, {
-    method: "POST",
-    headers: {
-      apikey: secretKey,
-      "Content-Type": "application/json",
-      Prefer: "return=minimal",
-    },
-    body: JSON.stringify(entry),
-    cache: "no-store",
-  });
+  const endpoint = `${url.replace(/\/+$/, "")}/rest/v1/fcfs_entries`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        apikey: secretKey,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(entry),
+      cache: "no-store",
+    });
+  } catch (error) {
+    console.error("HouseCraft Supabase request failed before receiving a response", {
+      name: error instanceof Error ? error.name : undefined,
+      message: error instanceof Error ? error.message : undefined,
+    });
+    throw new Error("The entry could not be stored.");
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as SupabaseError;
+    logSupabaseError(response.status, error);
     if (response.status === 409 || error.code === "23505") {
       throw new EntryConflictError(uniqueConflictMessage(error));
     }
