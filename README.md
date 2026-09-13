@@ -45,7 +45,7 @@ The browser submits only to `app/api/entries/route.ts`; validation and normaliza
 
 Submitted wallets are stored in `public.fcfs_entries`. RLS remains enabled, all table permissions are revoked from anonymous and authenticated browser roles, and no public INSERT policy is created. The secret server credential bypasses RLS only inside the validated API route. The project owner can view entries from the private Supabase Dashboard/Table Editor; protect the Supabase account and never expose the secret key.
 
-The registration endpoint also applies a server-side IP rate limit before parsing or storing a submission: 5 attempts per minute and 20 attempts per hour. Only an HMAC of the Vercel-provided client IP is retained, and stale limiter rows are removed after 24 hours. The limiter state is stored in a non-exposed `private` schema and can only be updated through a narrowly granted `security definer` function. Re-run `supabase/schema.sql` in the SQL Editor when deploying this rate limiter.
+Production rate limiting is enforced by a Vercel Firewall rule for `POST /api/entries`: 5 requests per 60 seconds per IP address. It runs before the request reaches the Next.js route or Supabase.
 
 ## Deploy to Vercel later
 
