@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { createEntry, EntryConfigurationError, EntryConflictError } from "@/lib/entries";
+import { isRegistrationAllowed, RateLimitConfigurationError } from "@/lib/rate-limit";
 import { isValidWallet, isValidXUsername, normalizeWallet, normalizeXUsername } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
+    if (!await isRegistrationAllowed(request)) {
+      return NextResponse.json(
+        { error: "Too many registration attempts. Please wait and try again." },
+        { status: 429 },
+      );
+    }
+
     const body = await request.json();
     const xUsername = normalizeXUsername(String(body.x_username ?? ""));
     const wallet = normalizeWallet(String(body.evm_wallet ?? ""));
@@ -33,8 +41,8 @@ export async function POST(request: Request) {
     if (error instanceof EntryConflictError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
-    if (error instanceof EntryConfigurationError) {
-      return NextResponse.json({ error: error.message }, { status: 503 });
+    if (error instanceof EntryConfigurationError || error instanceof RateLimitConfigurationError) {
+      return NextResponse.json({ error: "Registration is temporarily unavailable." }, { status: 503 });
     }
     return NextResponse.json({ error: "Something went wrong. Please try again." }, { status: 500 });
   }
