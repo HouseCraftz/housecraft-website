@@ -21,7 +21,7 @@ export default function CollectionPage() {
         <p>EVERY HOME HAS A FOUNDATION. EVERY BUILD HAS A STORY.</p>
       </header>
       <section className="collection-grid" aria-label="HouseCraft collection previews">
-        {[3491, 3492, 3493, 3494, 3495, 3496, 3497, 3498, 3499, 3500].map((index) => <CollectionCard key={index} index={index} />)}
+        {[3491, 3492, 3493, 3494, 3495, 3496, 3497, 3498, 3499].map((index) => <CollectionCard key={index} index={index} />)}
       </section>
       <section className="collection-info">
         {INFO.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>)}
