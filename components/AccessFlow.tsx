@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { SOCIAL_TASKS, type SocialTaskId } from "@/config/social";
 import { isValidWallet, isValidXUsername, normalizeXUsername } from "@/lib/validation";
-import { ACCESS_PROGRESS_KEY, COMPLETED_HOME_KEY } from "@/lib/session";
+import { ACCESS_PROGRESS_KEY, COMPLETED_HOME_KEY, progressStorage } from "@/lib/session";
 import { BrandMark } from "./BrandMark";
 import { BuildProgress } from "./BuildProgress";
 import { PixelButton } from "./PixelButton";
@@ -21,6 +21,7 @@ export function AccessFlow() {
   const [confirmedUsername, setConfirmedUsername] = useState("");
   const [wallet, setWallet] = useState("");
   const [tasks, setTasks] = useState<TaskState>(initialTasks);
+  const [openedTasks, setOpenedTasks] = useState<TaskState>(initialTasks);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
@@ -31,8 +32,8 @@ export function AccessFlow() {
 
   useEffect(() => {
     try {
-      setCompletedHome(window.sessionStorage.getItem(COMPLETED_HOME_KEY) === "true");
-      const saved = window.sessionStorage.getItem(ACCESS_PROGRESS_KEY);
+      setCompletedHome(progressStorage.getItem(COMPLETED_HOME_KEY) === "true");
+      const saved = progressStorage.getItem(ACCESS_PROGRESS_KEY);
       if (saved) {
         const progress = JSON.parse(saved) as Partial<{
           step: Step;
@@ -40,6 +41,7 @@ export function AccessFlow() {
           confirmedUsername: string;
           wallet: string;
           tasks: TaskState;
+          openedTasks: TaskState;
           demoMode: boolean;
         }>;
         if ([1, 2, 3, 4].includes(progress.step ?? 0)) setStep(progress.step as Step);
@@ -50,9 +52,12 @@ export function AccessFlow() {
           setTasks(progress.tasks);
         }
         if (typeof progress.demoMode === "boolean") setDemoMode(progress.demoMode);
+        if (progress.openedTasks && Object.keys(initialTasks).every((key) => typeof progress.openedTasks?.[key as SocialTaskId] === "boolean")) {
+          setOpenedTasks(progress.openedTasks);
+        }
       }
     } catch {
-      window.sessionStorage.removeItem(ACCESS_PROGRESS_KEY);
+      progressStorage.removeItem(ACCESS_PROGRESS_KEY);
     } finally {
       setSessionReady(true);
     }
@@ -60,8 +65,17 @@ export function AccessFlow() {
 
   useEffect(() => {
     if (!sessionReady) return;
-    window.sessionStorage.setItem(ACCESS_PROGRESS_KEY, JSON.stringify({ step, username, confirmedUsername, wallet, tasks, demoMode }));
-  }, [step, username, confirmedUsername, wallet, tasks, demoMode, sessionReady]);
+    progressStorage.setItem(ACCESS_PROGRESS_KEY, JSON.stringify({ step, username, confirmedUsername, wallet, tasks, openedTasks, demoMode }));
+  }, [step, username, confirmedUsername, wallet, tasks, openedTasks, demoMode, sessionReady]);
+
+  function openTask(id: SocialTaskId) {
+    const nextOpened = { ...openedTasks, [id]: true };
+    // Persist synchronously before X can close or replace the webview.
+    progressStorage.setItem(ACCESS_PROGRESS_KEY, JSON.stringify({
+      step, username, confirmedUsername, wallet, tasks, openedTasks: nextOpened, demoMode,
+    }));
+    setOpenedTasks(nextOpened);
+  }
 
   function confirmUsername(event: FormEvent) {
     event.preventDefault();
@@ -71,6 +85,10 @@ export function AccessFlow() {
       return;
     }
     setConfirmedUsername(normalized);
+    if (normalized.toLowerCase() !== confirmedUsername.toLowerCase()) {
+      setTasks(initialTasks);
+      setOpenedTasks(initialTasks);
+    }
     setUsername(normalized);
     setError("");
     setStep(2);
@@ -99,16 +117,17 @@ export function AccessFlow() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "SUBMISSION FAILED");
-      window.sessionStorage.removeItem(COMPLETED_HOME_KEY);
+      progressStorage.removeItem(COMPLETED_HOME_KEY);
       setCompletedHome(false);
       setDemoMode(Boolean(result.demo));
       setStep(4);
-      window.sessionStorage.setItem(ACCESS_PROGRESS_KEY, JSON.stringify({
+      progressStorage.setItem(ACCESS_PROGRESS_KEY, JSON.stringify({
         step: 4,
         username,
         confirmedUsername,
         wallet,
         tasks,
+        openedTasks,
         demoMode: Boolean(result.demo),
       }));
     } catch (submitError) {
@@ -163,6 +182,7 @@ export function AccessFlow() {
             <p className="eyebrow">HOUSECRAFT ACCESS</p>
             <h1>BUILD YOUR<br /><span>ACCESS</span></h1>
             <p className="lede">BUILD YOUR ACCESS, ONE STEP AT A TIME.</p>
+            <p className="fine-print">OPENED FROM X? BEFORE STARTING, USE ITS BROWSER MENU TO OPEN THIS SITE IN SAFARI OR CHROME. IF THAT OPTION IS MISSING, COPY THE SITE ADDRESS INTO YOUR BROWSER.</p>
             <form onSubmit={confirmUsername}>
               <label htmlFor="x-username">X ACCOUNT</label>
               <PixelInput id="x-username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@username" autoComplete="off" autoFocus />
@@ -181,12 +201,13 @@ export function AccessFlow() {
             </div>
             <div className="task-list">
               {SOCIAL_TASKS.map((task) => (
-                <TaskRow key={task.id} {...task} complete={tasks[task.id]} onComplete={() => setTasks((current) => ({ ...current, [task.id]: true }))} />
+                <TaskRow key={task.id} {...task} complete={tasks[task.id]} opened={openedTasks[task.id]} onOpen={() => openTask(task.id)} onComplete={() => setTasks((current) => ({ ...current, [task.id]: true }))} />
               ))}
             </div>
             <BuildProgress complete={completedCount} />
             <PixelButton disabled={completedCount !== 4} onClick={() => setStep(3)}>CONFIRM <span>→</span></PixelButton>
             <p className="fine-print">TASKS ARE SELF-CONFIRMED IN THIS VERSION.</p>
+            <p className="fine-print">AFTER EACH TASK, RETURN TO THIS TAB AND MARK IT DONE. IF X CLOSES THIS PAGE, REOPEN THE SAME SITE IN THE SAME BROWSER TO RESUME, WHEN BROWSER STORAGE IS AVAILABLE. SAFARI / CHROME AND THE X BROWSER DO NOT SHARE PROGRESS.</p>
             <aside className="build-alert" role="note">
               <strong>BUILD IT RIGHT.</strong>
               <span>Complete every task properly. Entries may be reviewed before consideration. Fake or incomplete submissions will be disqualified.</span>

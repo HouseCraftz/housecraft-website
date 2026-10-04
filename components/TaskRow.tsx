@@ -8,11 +8,12 @@ type Props = {
   detail: string;
   href: string;
   complete: boolean;
+  opened: boolean;
+  onOpen: () => void;
   onComplete: () => void;
 };
 
-export function TaskRow({ label, detail, href, complete, onComplete }: Props) {
-  const [opened, setOpened] = useState(false);
+export function TaskRow({ label, detail, href, complete, opened, onOpen, onComplete }: Props) {
   const [animating, setAnimating] = useState(false);
   const usableHref = href !== "PLACEHOLDER" ? href : "https://x.com";
 
@@ -34,7 +35,7 @@ export function TaskRow({ label, detail, href, complete, onComplete }: Props) {
       </div>
       {!complete && (
         <div className="task-actions">
-          <a href={usableHref} target="_blank" rel="noreferrer" onClick={() => setOpened(true)}>
+          <a href={usableHref} target="_blank" rel="noopener noreferrer" onClick={onOpen}>
             OPEN ↗
           </a>
           <button type="button" disabled={!opened || animating} onClick={markComplete}>

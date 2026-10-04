@@ -1,5 +1,5 @@
 export const HOUSECRAFT_X_PROFILE = "https://x.com/HouseCraftz?s=20";
-export const PINNED_POST_URL = "https://x.com/HouseCraftz?s=20";
+export const PINNED_POST_URL = HOUSECRAFT_X_PROFILE;
 
 export const SOCIAL_TASKS = [
   { id: "follow", label: "FOLLOW", href: HOUSECRAFT_X_PROFILE, detail: "HOUSECRAFT ON X" },
